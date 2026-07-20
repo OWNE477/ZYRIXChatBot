@@ -17,6 +17,7 @@ TOKEN = os.getenv("BOT_TOKEN")
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 
 client = None
+
 if OPENAI_KEY:
     client = OpenAI(api_key=OPENAI_KEY)
 
@@ -64,9 +65,10 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     if client is None:
         await update.message.reply_text(
-            "⚠️ هوش مصنوعی هنوز تنظیم نشده."
+            "⚠️ کلید هوش مصنوعی تنظیم نشده. لطفاً OPENAI_API_KEY را در Render اضافه کن."
         )
         return
 
@@ -77,4 +79,28 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         await update.message.reply_text(
-            result
+            result.output_text
+        )
+
+    except Exception as e:
+        await update.message.reply_text(
+            f"❌ خطا در اتصال به هوش مصنوعی:\n{e}"
+        )
+
+
+def main():
+    threading.Thread(target=run_server).start()
+
+    app = Application.builder().token(TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(button))
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, message)
+    )
+
+    app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
