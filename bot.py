@@ -1,103 +1,78 @@
 import os
-import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
-
 from openai import OpenAI
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+
+from telegram import Update
 from telegram.ext import (
     Application,
-    CommandHandler,
     MessageHandler,
-    CallbackQueryHandler,
-    filters,
-    ContextTypes
+    ContextTypes,
+    filters
 )
 
-TOKEN = os.getenv("BOT_TOKEN")
+# گرفتن کلیدها از Render
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 
+# اتصال OpenAI
 client = None
 
 if OPENAI_KEY:
     client = OpenAI(api_key=OPENAI_KEY)
 
 
-class HealthHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"ZYRIXChatBot is running")
-
-
-def run_server():
-    port = int(os.environ.get("PORT", 10000))
-    server = HTTPServer(("0.0.0.0", port), HealthHandler)
-    server.serve_forever()
-
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    buttons = [
-        [
-            InlineKeyboardButton("🤖 درباره ربات", callback_data="about"),
-            InlineKeyboardButton("📚 راهنما", callback_data="help")
-        ]
-    ]
-
-    await update.message.reply_text(
-        "سلام 👋\nمن ZYRIXChatBot هستم 🤖\nپیامت رو بفرست.",
-        reply_markup=InlineKeyboardMarkup(buttons)
-    )
-
-
-async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    if query.data == "about":
-        await query.message.reply_text(
-            "🤖 ZYRIXChatBot با هوش مصنوعی کار می‌کند."
-        )
-
-    elif query.data == "help":
-        await query.message.reply_text(
-            "💬 سوالت رو بفرست."
-        )
-
-
-async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
+async def ask_ai(message):
     if client is None:
-        await update.message.reply_text(
-            "⚠️ کلید هوش مصنوعی تنظیم نشده. لطفاً OPENAI_API_KEY را در Render اضافه کن."
-        )
-        return
+        return "❌ کلید هوش مصنوعی تنظیم نشده است."
 
     try:
-        result = client.responses.create(
-            model="gpt-4.1-mini",
-            input=update.message.text
+        result = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "تو دستیار هوش مصنوعی ZYRIX هستی. پاسخ‌ها را فارسی و دوستانه بده."
+                },
+                {
+                    "role": "user",
+                    "content": message
+                }
+            ]
         )
 
-        await update.message.reply_text(
-            result.output_text
-        )
+        return result.choices[0].message.content
 
     except Exception as e:
-        await update.message.reply_text(
-            f"❌ خطا در اتصال به هوش مصنوعی:\n{e}"
-        )
+        print("OPENAI ERROR:", e)
+        return "❌ خطا در اتصال هوش مصنوعی"
+
+
+async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    text = update.message.text
+
+    await update.message.chat.send_action("typing")
+
+    answer = await ask_ai(text)
+
+    await update.message.reply_text(answer)
 
 
 def main():
-    threading.Thread(target=run_server).start()
 
-    app = Application.builder().token(TOKEN).build()
+    if not BOT_TOKEN:
+        print("BOT_TOKEN پیدا نشد")
+        return
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(button))
+    app = Application.builder().token(BOT_TOKEN).build()
+
     app.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, message)
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            message_handler
+        )
     )
+
+    print("ZYRIXChatBot Started")
 
     app.run_polling()
 
