@@ -15,6 +15,7 @@ from telegram.ext import (
 TOKEN = os.getenv("BOT_TOKEN")
 
 
+# برای Render
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -28,32 +29,59 @@ def run_server():
     server.serve_forever()
 
 
+# دستور start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
+    buttons = [
         [
-            InlineKeyboardButton("📚 راهنما", callback_data="help"),
-            InlineKeyboardButton("🤖 درباره ربات", callback_data="about")
-        ],
-        [
-            InlineKeyboardButton("💬 ارتباط با ما", url="https://t.me/USERNAME")
+            InlineKeyboardButton("🤖 درباره ربات", callback_data="about"),
+            InlineKeyboardButton("📚 راهنما", callback_data="help")
         ]
     ]
 
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    keyboard = InlineKeyboardMarkup(buttons)
 
     await update.message.reply_text(
-        "سلام! من ZYRIXChatBot هستم 🤖\n\nیکی از گزینه‌ها رو انتخاب کن:",
-        reply_markup=reply_markup
+        "سلام 👋\nمن ZYRIXChatBot هستم 🤖\n\nیک گزینه انتخاب کن:",
+        reply_markup=keyboard
     )
 
 
+# دکمه‌ها
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    if query.data == "help":
+    if query.data == "about":
         await query.message.reply_text(
-            "📚 راهنما:\nپیامت رو بفرست تا پاسخ بگیری."
+            "🤖 ZYRIXChatBot\nربات هوشمند شما"
         )
 
-   
+    elif query.data == "help":
+        await query.message.reply_text(
+            "📚 راهنما:\nپیامت رو ارسال کن."
+        )
+
+
+# پیام‌های معمولی
+async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "پیامت دریافت شد ✅"
+    )
+
+
+# اجرای سرور Render
+threading.Thread(target=run_server, daemon=True).start()
+
+
+if not TOKEN:
+    print("BOT_TOKEN پیدا نشد!")
+
+app = Application.builder().token(TOKEN).build()
+
+app.add_handler(CommandHandler("start", start))
+app.add_handler(CallbackQueryHandler(button))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message))
+
+print("ZYRIXChatBot is ready!")
+
+app.run_polling()  
