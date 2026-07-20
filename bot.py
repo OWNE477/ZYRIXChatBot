@@ -13,12 +13,11 @@ from telegram.ext import (
     ContextTypes
 )
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-OPENAI_KEY = os.getenv("OPENAI_API_KEY")
+TOKEN = os.getenv("BOT_TOKEN")
 
 client = None
-if OPENAI_KEY:
-    client = OpenAI(api_key=OPENAI_KEY)
+if os.getenv("OPENAI_API_KEY"):
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 class HealthHandler(BaseHTTPRequestHandler):
@@ -35,7 +34,7 @@ def run_server():
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
+    buttons = [
         [
             InlineKeyboardButton("🤖 درباره ربات", callback_data="about"),
             InlineKeyboardButton("📚 راهنما", callback_data="help")
@@ -44,7 +43,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         "سلام 👋\nمن ZYRIXChatBot هستم 🤖\nپیامت رو بفرست.",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        reply_markup=InlineKeyboardMarkup(buttons)
     )
 
 
@@ -54,7 +53,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if query.data == "about":
         await query.message.reply_text(
-            "🤖 ZYRIXChatBot\nربات هوشمند گفتگو"
+            "🤖 ZYRIXChatBot با هوش مصنوعی کار می‌کند."
         )
 
     elif query.data == "help":
@@ -64,21 +63,19 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not client:
+    if client is None:
         await update.message.reply_text(
-            "⚠️ هوش مصنوعی هنوز وصل نشده."
+            "⚠️ هوش مصنوعی هنوز تنظیم نشده."
         )
         return
 
     try:
-        response = client.responses.create(
+        result = client.responses.create(
             model="gpt-4.1-mini",
             input=update.message.text
         )
 
-        await update.message.reply_text(
-            response.output_text
-        )
+        await update.message.reply_text(result.output_text)
 
     except Exception:
         await update.message.reply_text(
@@ -89,7 +86,7 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 threading.Thread(target=run_server, daemon=True).start()
 
 
-app = Application.builder().token(BOT_TOKEN).build()
+app = Application.builder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CallbackQueryHandler(button))
