@@ -13,10 +13,12 @@ from telegram.ext import (
     ContextTypes
 )
 
-TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 
-client = OpenAI(api_key=OPENAI_KEY)
+client = None
+if OPENAI_KEY:
+    client = OpenAI(api_key=OPENAI_KEY)
 
 
 class HealthHandler(BaseHTTPRequestHandler):
@@ -33,7 +35,7 @@ def run_server():
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    buttons = [
+    keyboard = [
         [
             InlineKeyboardButton("🤖 درباره ربات", callback_data="about"),
             InlineKeyboardButton("📚 راهنما", callback_data="help")
@@ -41,8 +43,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
 
     await update.message.reply_text(
-        "سلام 👋\nمن ZYRIXChatBot هستم 🤖\n\nپیامت رو بفرست تا جواب بدم.",
-        reply_markup=InlineKeyboardMarkup(buttons)
+        "سلام 👋\nمن ZYRIXChatBot هستم 🤖\nپیامت رو بفرست.",
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 
@@ -51,31 +53,43 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     if query.data == "about":
-        await query.message.reply_text("🤖 ZYRIXChatBot با هوش مصنوعی کار می‌کند.")
+        await query.message.reply_text(
+            "🤖 ZYRIXChatBot\nربات هوشمند گفتگو"
+        )
 
     elif query.data == "help":
-        await query.message.reply_text("💬 هر سوالی داری بفرست.")
+        await query.message.reply_text(
+            "💬 سوالت رو بفرست."
+        )
 
 
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not client:
+        await update.message.reply_text(
+            "⚠️ هوش مصنوعی هنوز وصل نشده."
+        )
+        return
+
     try:
         response = client.responses.create(
-            model="gpt-5.6",
+            model="gpt-4.1-mini",
             input=update.message.text
         )
 
-        await update.message.reply_text(response.output_text)
-
-    except Exception as e:
         await update.message.reply_text(
-            "❌ مشکلی در اتصال به هوش مصنوعی پیش آمد."
+            response.output_text
+        )
+
+    except Exception:
+        await update.message.reply_text(
+            "❌ خطا در اتصال به هوش مصنوعی"
         )
 
 
 threading.Thread(target=run_server, daemon=True).start()
 
 
-app = Application.builder().token(TOKEN).build()
+app = Application.builder().token(BOT_TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CallbackQueryHandler(button))
